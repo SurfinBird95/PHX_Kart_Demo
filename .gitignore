@@ -1,0 +1,10 @@
+# Local MATLAB/editor state and generated test output
+*.asv
+*.m~
+*.mat
+*.log
+/kart_*.png
+/tests/*.png
+/slprj/
+/.DS_Store
+/Thumbs.db
