@@ -441,7 +441,7 @@ function fig = phx_kart_demo(options)
         end
         props=zeros(numel(courseBodies),2);
         for k=1:numel(courseBodies), p=courseBodies(k).Position; props(k,:)=p(1:2); end
-        [xy,yaw,index]=phxkart.recoveryPose(T,race{j},others,props);
+        [xy,yaw,index]=phxkart.recoveryPose(T,bodies(j).Position,others,props);
         if isempty(xy), return; end % Retry when the road is clear.
         bodies(j).Position=[xy .25+phxkart.roadSurface(T,xy)];
         bodies(j).EulerAngles=[0 0 yaw];
