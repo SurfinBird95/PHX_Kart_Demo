@@ -71,7 +71,7 @@ phx_kart_demo(Start=true, Track="obstacle")
 - **Technical Circuit** (default): flowing corners, a tight chicane and an alternative obstacle route inspired by the Rettifilo escape lane. Both routes count when their checkpoints are followed.
 - **Oval:** a simple circuit for getting used to the controls.
 - **Figure eight:** an at-grade crossing, a banked outer corner with a red high-grip surface, barriers and trackside banners.
-- **Obstacle Course:** a compact stadium loop with two jump ramps, a swinging hammer and five movable hay bales. Keep some speed for the jumps, time your passage past the hammer, and push the bales out of your way. **R** restores the obstacles as well as the karts. Available in single-player, split screen and with NPCs.
+- **Obstacle Course:** a compact stadium loop with two jump ramps, a swinging hammer, five movable hay bales and six orange-and-white traffic cones arranged as a slalom after the first jump. Keep some speed for the jumps, time your passage past the hammer, and push the bales or cones out of your way. **R** restores the obstacles as well as the karts. Available in single-player, split screen and with NPCs.
 - **0–8 NPCs**, with **Easy / Medium / Hard / Race** difficulty; up to ten karts with two human players.
 - Chase cameras, equal split-screen views, brake lights, start lights, reverse, lap timing and checkpoints.
 - HUD speed, engine RPM, gear, grip indication, lap information and throttle/brake/steering bars.
@@ -82,7 +82,7 @@ There is no fixed race length or championship. The single-speed and manual drive
 
 PHX handles rigid-body stepping and physical contacts. The demo supplies its own approximate engine, tyre, drivetrain and control models. Vehicle motion is primarily planar, with additional banked-surface forces and visual tilt. Grip and steering assistance have been tuned for keyboard play, including intentionally increased grip on the red surface.
 
-The obstacle course adds vertical motion: ramp support, ballistic flight under gravity and landing. Tyre forces are disabled while airborne; the HUD shows **AIRBORNE**. This remains a simplified height-field model rather than a full suspension/rollover simulation. The hammer is a prescribed pendulum with a PHX kinematic collider, and hay bales are dynamic PHX bodies constrained to the ground with sliding drag. NPCs use a conservative speed cap on this course and can be struck or blocked by obstacles.
+The obstacle course adds vertical motion: ramp support, ballistic flight under gravity and landing. Tyre forces are disabled while airborne; the HUD shows **AIRBORNE**. This remains a simplified height-field model rather than a full suspension/rollover simulation. The hammer is a prescribed pendulum with a PHX kinematic collider. Hay bales and lightweight cones are dynamic PHX bodies with simplified box colliders, constrained upright to the ground with sliding drag. NPCs use a conservative speed cap on this course and can be struck or blocked by obstacles.
 
 ![Obstacle course overview](docs/obstacle-course.png)
 

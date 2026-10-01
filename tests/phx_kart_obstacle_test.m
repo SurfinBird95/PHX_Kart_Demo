@@ -14,6 +14,15 @@ function phx_kart_obstacle_test
     assert(norm(props(1).Position-initial)>.5,'Hay must move after a real kart contact.');
     phxkart.stepCourse(T,props,0,0,true);
     assert(norm(props(1).Position-initial)<1e-9,'Reset must restore hay.');
+    cone=size(T.course.hay,1)+1; initialCone=props(cone).Position;
+    kart.Position=initialCone+[-3 0 -.15]; kart.EulerAngles=[0 0 0];
+    kart.LinearVelocity=[6 0 0]; kart.AngularVelocity=[0 0 0];
+    for k=1:100
+        phxkart.stepCourse(T,props,k*.008,.008,false); sim.step(.008,1,-1);
+    end
+    assert(norm(props(cone).Position-initialCone)>.5,'Cone must slide after contact.');
+    phxkart.stepCourse(T,props,0,0,true);
+    assert(norm(props(cone).Position-initialCone)<1e-9,'Reset must restore cones.');
     % Put a kart in the pendulum sweep and let the moving PHX collider hit it.
     kart.Position=[36 -.3 .25]; kart.LinearVelocity=[0 0 0]; kart.AngularVelocity=[0 0 0];
     speed=0;
@@ -41,7 +50,7 @@ function phx_kart_obstacle_test
     cleanFigure=onCleanup(@()closeValid(f)); api=getappdata(f,'PHXKartDemo');
     for k=1:50, api.Step(); end
     s=api.Snapshot(); assert(size(s.Position,1)==10 && all(isfinite(s.Position),'all'));
-    fprintf('PASS: obstacle course, movable hay, hammer contact, jump/landing, pause/reset and 10-kart split screen.\n');
+    fprintf('PASS: obstacle course, movable hay/cones, hammer contact, jump/landing, pause/reset and 10-kart split screen.\n');
 end
 function closeValid(f), if isgraphics(f), close(f); end, end
 function dispose(sim,bodies)

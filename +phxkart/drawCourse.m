@@ -23,6 +23,19 @@ function G = drawCourse(ax,T)
                 'Color',[.95 .77 .36]);
         end
     end
+    G.cones=gobjects(1,size(C.cones,1));
+    for k=1:numel(G.cones)
+        G.cones(k)=hgtransform('Parent',ax,'Tag','KartTrafficCone');
+        box(G.cones(k),[0 0 -.355],[.72 .72 .09],[.12 .14 .16]);
+        levels=[.09 .30 .43 .60 .71 .80];
+        for band=1:numel(levels)-1
+            z=levels(band:band+1); radius=.30*(.83-z)/.74;
+            [x,y,h]=cylinder(radius,12);
+            color=[1 .29 .035]; if mod(band,2)==0, color=[.96 .96 .9]; end
+            surf('Parent',G.cones(k),'XData',x,'YData',y,'ZData',h*diff(z)+z(1)-.4, ...
+                'FaceColor',color,'EdgeColor','none','FaceLighting','none');
+        end
+    end
     side=[-sin(C.yaw) cos(C.yaw) 0];
     for s=[-1 1]
         p=C.pivot+s*6*side;
