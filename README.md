@@ -82,7 +82,7 @@ There is no fixed race length or championship. The single-speed and manual drive
 
 PHX handles rigid-body stepping and physical contacts. The demo supplies its own approximate engine, tyre, drivetrain and control models. Vehicle motion is primarily planar, with additional banked-surface forces and visual tilt. Grip and steering assistance have been tuned for keyboard play, including intentionally increased grip on the red surface.
 
-The obstacle course adds vertical motion: ramp support, ballistic flight under gravity and landing. Tyre forces are disabled while airborne; the HUD shows **AIRBORNE**. This remains a simplified height-field model rather than a full suspension/contact simulation. Left/right wheel support drives a reduced roll model: straddling a ramp edge can tip the kart onto its side. A rolled kart loses tyre drive and displays **ROLLED OVER - press R**; reset restores it upright. The hammer is a prescribed pendulum with a PHX kinematic collider. Hay bales and lightweight cones are dynamic PHX bodies with simplified box colliders, constrained upright to the ground with sliding drag. NPCs use a conservative speed cap on this course and can be struck or blocked by obstacles.
+The obstacle course adds vertical motion: ramp support, ballistic flight under gravity and landing. Tyre forces are disabled while airborne; the HUD shows **AIRBORNE**. This remains a simplified height-field model rather than a full suspension/contact simulation. Left/right wheel support drives a reduced roll model: straddling a ramp edge can tip the kart onto its side. A rolled kart loses tyre drive and automatically recovers after two simulation seconds. It returns upright and stationary to a clear, flat spot behind its last checkpoint; if no spot is clear, it waits. This affects only that kart, preserves completed lap times and marks the current lap invalid. The HUD shows the recovery countdown. **R** remains the full-grid reset. The hammer is a prescribed pendulum with a PHX kinematic collider. Hay bales and lightweight cones are dynamic PHX bodies with simplified box colliders, constrained upright to the ground with sliding drag. NPCs use a conservative speed cap on this course and can be struck or blocked by obstacles.
 
 ![Obstacle course overview](docs/obstacle-course.png)
 
@@ -111,6 +111,7 @@ phx_kart_bank_test
 phx_kart_npc_test("gui")
 phx_kart_obstacle_test
 phx_kart_rollover_test
+phx_kart_recovery_test
 ```
 
 Additional, longer checks are `phx_kart_handling_test`, `phx_kart_npc_test` and `phx_kart_npc_pack_test`. Tests may create preview PNGs and briefly open graphics windows; generated files are ignored by Git.

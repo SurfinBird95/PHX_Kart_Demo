@@ -47,6 +47,7 @@ function fig = phx_kart_demo(options)
     sim = []; bodies = phx.Body.empty; obstacles = phx.Body.empty; clockTimer = [];
     courseBodies=phx.Body.empty; courseViews={}; airborne=[];
     rolls=[]; rollRates=[]; tipped=[];
+    recoveryTime=[];
     running = false; paused = false; busy = false; keys = struct;
     steeringPriority = [0 0];
     T = []; P = {}; S = {}; race = {}; diagnostics = {};
@@ -65,6 +66,7 @@ function fig = phx_kart_demo(options)
         'returnTime',options.ReturnTime),1,2);
     if isprop(fig,'WindowFocusLostFcn'), fig.WindowFocusLostFcn = @lostFocus; end
     api = struct('Step',@tick,'Snapshot',@snapshot,'Menu',@showMenu);
+    api.Recover=@recoverKart;
     setappdata(fig,'PHXKartDemo',api);
     try
         if options.Start
@@ -180,6 +182,7 @@ function fig = phx_kart_demo(options)
         totalCount = n+npcCount; npcPlan = phxkart.npcPlan(T,difficulty);
         airborne=false(1,totalCount); courseViews=cell(1,n);
         rolls=zeros(1,totalCount); rollRates=rolls; tipped=false(1,totalCount);
+        recoveryTime=zeros(1,totalCount);
         npcState = cell(1,totalCount); npcCommands = zeros(totalCount,3);
         if isscalar(manual), manual = repmat(manual,1,n); end
         P = cell(1,totalCount); S = cell(1,totalCount); race = cell(1,totalCount); diagnostics = cell(1,totalCount);
@@ -264,6 +267,7 @@ function fig = phx_kart_demo(options)
         if ~isempty(T.course), bodies(j).Position=[xy .25+phxkart.roadSurface(T,xy)]; end
         airborne(j)=false;
         rolls(j)=0; rollRates(j)=0; tipped(j)=false;
+        recoveryTime(j)=0;
         bodies(j).EulerAngles = [0 0 yaw];
         bodies(j).LinearVelocity = [0 0 0]; bodies(j).AngularVelocity = [0 0 0];
         S{j} = phxkart.state;
@@ -369,6 +373,14 @@ function fig = phx_kart_demo(options)
                     if norm(pos(1:2))>160, resetKart(j); end
                 end
             end
+            for j=1:totalCount
+                if tipped(j)
+                    recoveryTime(j)=recoveryTime(j)+tickDuration;
+                    if recoveryTime(j)>=2, recoverKart(j); end
+                else
+                    recoveryTime(j)=0;
+                end
+            end
             render();
             drawnow limitrate;
             if isgraphics(status) && running && ~paused
@@ -417,6 +429,33 @@ function fig = phx_kart_demo(options)
         npcState{j}.index = index; npcState{j}.stuck = 0;
         npcState{j}.recoveries = npcState{j}.recoveries+1;
         npcCommands(j,:) = [0 0 0];
+    end
+
+    function recovered = recoverKart(j)
+        recovered=false;
+        if ~running || j<1 || j>totalCount || fix(j)~=j, return; end
+        others=zeros(totalCount-1,2); row=0;
+        for k=1:totalCount
+            if k==j, continue; end
+            row=row+1; p=bodies(k).Position; others(row,:)=p(1:2);
+        end
+        props=zeros(numel(courseBodies),2);
+        for k=1:numel(courseBodies), p=courseBodies(k).Position; props(k,:)=p(1:2); end
+        [xy,yaw,index]=phxkart.recoveryPose(T,race{j},others,props);
+        if isempty(xy), return; end % Retry when the road is clear.
+        bodies(j).Position=[xy .25+phxkart.roadSurface(T,xy)];
+        bodies(j).EulerAngles=[0 0 yaw];
+        bodies(j).LinearVelocity=[0 0 0]; bodies(j).AngularVelocity=[0 0 0];
+        rolls(j)=0; rollRates(j)=0; tipped(j)=false; airborne(j)=false; recoveryTime(j)=0;
+        S{j}=phxkart.state; race{j}.valid=false;
+        diagnostics{j}=struct('grip',0,'speed',0,'onRoad',true);
+        if j<=count
+            cameraPos{j}=[]; cameraTarget{j}=[];
+        else
+            npcState{j}.index=index; npcState{j}.stuck=0;
+            npcState{j}.recoveries=npcState{j}.recoveries+1; npcCommands(j,:)=[0 0 0];
+        end
+        recovered=true;
     end
 
     function input = readInput(j)
@@ -541,7 +580,11 @@ function fig = phx_kart_demo(options)
             hudText = sprintf('PLAYER %d\n%5.1f km/h\n%5.0f RPM   /   %s\nGRIP %3.0f%%  |  %s', ...
                 j,d.speed,s.rpm,gear,100*d.grip,roadName(d.onRoad));
             if airborne(j), hudText=[hudText newline 'AIRBORNE']; end
-            if tipped(j), hudText=[hudText newline 'ROLLED OVER - press R']; end
+            if tipped(j)
+                if recoveryTime(j)<2, message=sprintf('AUTO RECOVERY %.1f s',2-recoveryTime(j));
+                else, message='RECOVERY: waiting for clear track'; end
+                hudText=[hudText newline message];
+            end
             hud(j).String=hudText;
             elapsed = 0; if r.started, elapsed = nowTime-r.startTime; end
             good = r.times(logical(r.validTimes)); best = '--';
@@ -578,6 +621,7 @@ function fig = phx_kart_demo(options)
         data.NPCs = npcCount; data.Difficulty = difficulty; data.NPCState = npcState;
         data.Airborne=airborne;
         data.Roll=rolls; data.RolledOver=tipped;
+        data.RecoveryTime=recoveryTime;
         data.CoursePosition=zeros(numel(courseBodies),3);
         for k=1:numel(courseBodies), data.CoursePosition(k,:)=courseBodies(k).Position; end
         [data.StartLights,locked] = phxkart.startSignal(nowTime-startSequenceTime,options.StartLights);
