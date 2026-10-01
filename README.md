@@ -44,6 +44,9 @@ phx_kart_demo(Start=true, Players=2, NPCs=4, Difficulty="hard")
 
 % Solo, six-speed manual, banked figure-eight track
 phx_kart_demo(Start=true, Track="eight", Manual=true)
+
+% Compact obstacle course with ramps and movable obstacles
+phx_kart_demo(Start=true, Track="obstacle")
 ```
 
 `Manual=[true false]` gives player 1 a manual gearbox and player 2 a single-speed kart. Multiplayer is local split screen on one computer; there is no online multiplayer.
@@ -68,6 +71,7 @@ phx_kart_demo(Start=true, Track="eight", Manual=true)
 - **Technical Circuit** (default): flowing corners, a tight chicane and an alternative obstacle route inspired by the Rettifilo escape lane. Both routes count when their checkpoints are followed.
 - **Oval:** a simple circuit for getting used to the controls.
 - **Figure eight:** an at-grade crossing, a banked outer corner with a red high-grip surface, barriers and trackside banners.
+- **Obstacle Course:** a compact stadium loop with two jump ramps, a swinging hammer and five movable hay bales. Keep some speed for the jumps, time your passage past the hammer, and push the bales out of your way. **R** restores the obstacles as well as the karts. Available in single-player, split screen and with NPCs.
 - **0–8 NPCs**, with **Easy / Medium / Hard / Race** difficulty; up to ten karts with two human players.
 - Chase cameras, equal split-screen views, brake lights, start lights, reverse, lap timing and checkpoints.
 - HUD speed, engine RPM, gear, grip indication, lap information and throttle/brake/steering bars.
@@ -77,6 +81,10 @@ There is no fixed race length or championship. The single-speed and manual drive
 ## Physics and performance
 
 PHX handles rigid-body stepping and physical contacts. The demo supplies its own approximate engine, tyre, drivetrain and control models. Vehicle motion is primarily planar, with additional banked-surface forces and visual tilt. Grip and steering assistance have been tuned for keyboard play, including intentionally increased grip on the red surface.
+
+The obstacle course adds vertical motion: ramp support, ballistic flight under gravity and landing. Tyre forces are disabled while airborne; the HUD shows **AIRBORNE**. This remains a simplified height-field model rather than a full suspension/rollover simulation. The hammer is a prescribed pendulum with a PHX kinematic collider, and hay bales are dynamic PHX bodies constrained to the ground with sliding drag. NPCs use a conservative speed cap on this course and can be struck or blocked by obstacles.
+
+![Obstacle course overview](docs/obstacle-course.png)
 
 More opponents and two rendered views increase computation and drawing time. If the game runs slowly, reduce the NPC count or switch to one player. Some keyboards cannot register all the keys required by two players at once.
 
@@ -101,6 +109,7 @@ phx_kart_start_reverse_test
 phx_kart_escape_test
 phx_kart_bank_test
 phx_kart_npc_test("gui")
+phx_kart_obstacle_test
 ```
 
 Additional, longer checks are `phx_kart_handling_test`, `phx_kart_npc_test` and `phx_kart_npc_pack_test`. Tests may create preview PNGs and briefly open graphics windows; generated files are ignored by Git.

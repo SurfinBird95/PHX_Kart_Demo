@@ -21,6 +21,16 @@ function T = track(name)
             dense(end+1,:) = dense(1,:);
             arc = [0;cumsum(vecnorm(diff(dense),2,2))];
             xy = interp1(arc,dense,(0:719)'*arc(end)/720,'linear');
+        case "obstacle"
+            a=linspace(-pi/2,pi/2,181)'; b=linspace(pi/2,3*pi/2,181)';
+            dense=[linspace(-22,22,181)' -14*ones(181,1); ...
+                22+14*cos(a(2:end)) 14*sin(a(2:end)); ...
+                linspace(22,-22,181)' 14*ones(181,1); ...
+                -22+14*cos(b(2:end)) 14*sin(b(2:end))];
+            dense=unique(dense,'rows','stable'); dense(end+1,:)=dense(1,:);
+            arc=[0;cumsum(vecnorm(diff(dense),2,2))];
+            [arc,keep]=unique(arc,'stable'); dense=dense(keep,:);
+            xy=interp1(arc,dense,(0:719)'*arc(end)/720);
         case "oval"
             xy = [42*cos(t), 25*sin(t)];
         case "eight"
@@ -42,6 +52,15 @@ function T = track(name)
     T.tangent = tangent;
     T.normal = [-tangent(:,2),tangent(:,1)];
     T.width = 9;
+    T.course = [];
+    if strcmpi(name,'obstacle')
+        T.course.ramps=struct('center',{},'yaw',{},'length',{},'height',{},'width',{},'descent',{});
+        T.course.ramps(1)=struct('center',[-5 -14],'yaw',0,'length',6,'height',1.1,'width',6,'descent',1.5);
+        T.course.ramps(2)=struct('center',[8 14],'yaw',pi,'length',4.5,'height',.8,'width',5.5,'descent',1.5);
+        T.course.hay=[-5 14 0;-10 11.7 .25;-13 16 -.2;-34 3 .4;-35 -1 -.3];
+        T.course.pivot=[36 0 5]; T.course.yaw=pi/2;
+        T.course.arm=4.2; T.course.amplitude=.85; T.course.period=3.6;
+    end
     T.bank = zeros(size(xy,1),1);
     T.bankWalls = struct('position',{},'angle',{},'size',{},'base',{});
     if strcmpi(name,'eight')

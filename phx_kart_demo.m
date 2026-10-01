@@ -4,6 +4,7 @@ function fig = phx_kart_demo(options)
 %   F = PHX_KART_DEMO(Start=true,Track="eight",Players=2,Manual=true)
 %   starts directly. Manual may be scalar or one logical per player.
 %   NPCs=0..8 adds opponents; Difficulty="easy"/"medium"/"hard"/"race".
+%   Track="obstacle" adds ramps, airborne motion, a hammer and movable hay.
 %   ThrottleTime, BrakeTime, SteerTime and ReturnTime set keyboard ramps
 %   in seconds (0.05..2). Larger values mean smoother/slower application.
 %   The menu allows separate values for each player; HUD bars show applied
@@ -19,7 +20,7 @@ function fig = phx_kart_demo(options)
 %   This is an approximate planar model, not a validated kart simulator.
     arguments
         options.Start (1,1) logical = false
-        options.Track (1,1) string {mustBeMember(options.Track,["technical","oval","eight"])} = "technical"
+        options.Track (1,1) string {mustBeMember(options.Track,["technical","oval","eight","obstacle"])} = "technical"
         options.Players (1,1) double {mustBeMember(options.Players,[1 2])} = 1
         options.Manual (1,:) logical = false
         options.NPCs (1,1) double {mustBeInteger,mustBeInRange(options.NPCs,0,8)} = 0
@@ -44,6 +45,7 @@ function fig = phx_kart_demo(options)
         'Visible',options.Visible,'CloseRequestFcn',@closeDemo, ...
         'WindowKeyPressFcn',@keyDown,'WindowKeyReleaseFcn',@keyUp);
     sim = []; bodies = phx.Body.empty; obstacles = phx.Body.empty; clockTimer = [];
+    courseBodies=phx.Body.empty; courseViews={}; airborne=[];
     running = false; paused = false; busy = false; keys = struct;
     steeringPriority = [0 0];
     T = []; P = {}; S = {}; race = {}; diagnostics = {};
@@ -90,7 +92,7 @@ function fig = phx_kart_demo(options)
             'Position',[.09 .665 .33 .05],'String',{'Single player','Two players - split screen'},'FontSize',13,'Tag','KartPlayers');
         label([.52 .72 .25 .035],'CIRCUIT',12,white);
         selectorTrack = uicontrol(fig,'Style','popupmenu','Units','normalized', ...
-            'Position',[.52 .665 .33 .05],'String',{'Technical Circuit - default','Oval','Figure eight - level crossing'},'FontSize',13);
+            'Position',[.52 .665 .33 .05],'String',{'Technical Circuit - default','Oval','Figure eight - level crossing','Obstacle Course - jumps & hammer'},'FontSize',13);
         for j = 1:2
             x = .09+(j-1)*.43;
             label([x .60 .35 .035],sprintf('PLAYER %d / POWERTRAIN',j),12,white);
@@ -158,7 +160,7 @@ function fig = phx_kart_demo(options)
     end
 
     function startFromMenu(varargin)
-        tracks = ["technical","oval","eight"];
+        tracks = ["technical","oval","eight","obstacle"];
         npcCount = selectorNPCs.Value-1;
         levels = ["easy","medium","hard","race"]; difficulty = levels(selectorDifficulty.Value);
         try
@@ -175,6 +177,7 @@ function fig = phx_kart_demo(options)
         releaseWorld(); delete(fig.Children);
         count = n; T = phxkart.track(trackName); nowTime = 0; startSequenceTime = 0;
         totalCount = n+npcCount; npcPlan = phxkart.npcPlan(T,difficulty);
+        airborne=false(1,totalCount); courseViews=cell(1,n);
         npcState = cell(1,totalCount); npcCommands = zeros(totalCount,3);
         if isscalar(manual), manual = repmat(manual,1,n); end
         P = cell(1,totalCount); S = cell(1,totalCount); race = cell(1,totalCount); diagnostics = cell(1,totalCount);
@@ -218,7 +221,8 @@ function fig = phx_kart_demo(options)
                 'EulerAngles',[0 0 O.angle],'Shape',{'Box','Size',[O.size(1:2) height]}, ...
                 'Friction',[.15 0 0],'Restitution',.05);
         end
-        sim = phx.Simulation([bodies obstacles],'Gravity',[0 0 0]);
+        courseBodies=phxkart.courseBodies(T);
+        sim = phx.Simulation([bodies obstacles courseBodies],'Gravity',[0 0 0]);
         for j = 1:n
             if n==1, y = .065; h = .86; else, h = .42; y = .065+(2-j)*.44; end
             viewport = uipanel(fig,'Units','normalized','Position',[.01 y .77 h], ...
@@ -226,6 +230,7 @@ function fig = phx_kart_demo(options)
             axs(j) = axes(viewport,'Units','normalized','Position',[0 0 1 1], ...
                 'Color',[.55 .70 .79],'Clipping','on','ClippingStyle','rectangle');
             phxkart.drawTrack(axs(j),T);
+            courseViews{j}=phxkart.drawCourse(axs(j),T);
             startGates{j} = phxkart.drawStartGate(axs(j),T);
             disableDefaultInteractivity(axs(j)); axs(j).Toolbar.Visible = 'off';
             for k = 1:totalCount, G{j,k} = phxkart.drawKart(axs(j),colors(k,:)); end
@@ -254,6 +259,8 @@ function fig = phx_kart_demo(options)
             [xy,yaw,index] = phxkart.gridPose(T,slot,totalCount);
         end
         bodies(j).Position = [xy .25];
+        if ~isempty(T.course), bodies(j).Position=[xy .25+phxkart.roadSurface(T,xy)]; end
+        airborne(j)=false;
         bodies(j).EulerAngles = [0 0 yaw];
         bodies(j).LinearVelocity = [0 0 0]; bodies(j).AngularVelocity = [0 0 0];
         S{j} = phxkart.state;
@@ -294,6 +301,7 @@ function fig = phx_kart_demo(options)
                 end
             end
             for sub = 1:4
+                phxkart.stepCourse(T,courseBodies,nowTime-startSequenceTime,dt,false);
                 [~,gridLocked] = phxkart.startSignal(nowTime-startSequenceTime,options.StartLights);
                 prev = zeros(totalCount,2);
                 for j = 1:totalCount
@@ -303,11 +311,21 @@ function fig = phx_kart_demo(options)
                     if race{j}.started && distance>T.width/2+.5, race{j}.valid = false; end
                     velocity = (bodies(j).Orientation'*bodies(j).LinearVelocity')';
                     w = bodies(j).AngularVelocity;
-                    [~,grade,gripScale] = phxkart.roadSurface(T,pos(1:2));
+                    [height,grade,gripScale] = phxkart.roadSurface(T,pos(1:2));
+                    if ~isempty(T.course)
+                        airborne(j)=pos(3)>height+.285;
+                    end
                     rotation = bodies(j).Orientation;
                     grade = (rotation(1:2,1:2)'*grade')';
                     [S{j},force,moment,diagnostics{j}] = phxkart.forces( ...
                         S{j},P{j},velocity,w(3),readInput(j),onRoad,dt,grade,gripScale);
+                    if ~isempty(T.course)
+                        if airborne(j)
+                            force=[-.25*velocity(1)*abs(velocity(1)) -.25*velocity(2)*abs(velocity(2)) 0];
+                            moment=[0 0 0]; diagnostics{j}.grip=0;
+                        end
+                        force(3)=-P{j}.mass*9.81;
+                    end
                     if gridLocked
                         bodies(j).LinearVelocity = [0 0 0]; bodies(j).AngularVelocity = [0 0 0];
                         S{j}.ax = 0; S{j}.ay = 0;
@@ -321,8 +339,17 @@ function fig = phx_kart_demo(options)
                     % Constrain this deliberately planar model after contact resolution.
                     pos = bodies(j).Position; angle = bodies(j).EulerAngles;
                     v = bodies(j).LinearVelocity; w = bodies(j).AngularVelocity;
-                    bodies(j).Position = [pos(1:2) .25]; bodies(j).EulerAngles = [0 0 angle(3)];
-                    bodies(j).LinearVelocity = [v(1:2) 0]; bodies(j).AngularVelocity = [0 0 w(3)];
+                    if isempty(T.course)
+                        pos(3)=.25; v(3)=0;
+                    else
+                        [height,grade]=phxkart.roadSurface(T,pos(1:2));
+                        if pos(3)<=height+.25
+                            pos(3)=height+.25; v(3)=dot(grade,v(1:2));
+                        end
+                        airborne(j)=pos(3)>height+.285;
+                    end
+                    bodies(j).Position=pos; bodies(j).EulerAngles=[0 0 angle(3)];
+                    bodies(j).LinearVelocity=v; bodies(j).AngularVelocity=[0 0 w(3)];
                     race{j} = phxkart.checkGate(race{j},T,prev(j,:),pos(1:2),nowTime,dt);
                     if norm(pos(1:2))>160, resetKart(j); end
                 end
@@ -367,6 +394,8 @@ function fig = phx_kart_demo(options)
         others = positions([1:j-1 j+1:end],:);
         if any(vecnorm(others-xy,2,2)<5), return; end
         bodies(j).Position = [xy .25]; bodies(j).EulerAngles = [0 0 yaw];
+        if ~isempty(T.course), bodies(j).Position=[xy .25+phxkart.roadSurface(T,xy)]; end
+        airborne(j)=false;
         bodies(j).LinearVelocity = [0 0 0]; bodies(j).AngularVelocity = [0 0 0];
         S{j} = phxkart.state; race{j}.valid = false;
         npcState{j}.index = index; npcState{j}.stuck = 0;
@@ -398,6 +427,7 @@ function fig = phx_kart_demo(options)
             case 'escape', showMenu(); return;
             case 'r'
                 startSequenceTime = nowTime;
+                phxkart.stepCourse(T,courseBodies,0,0,true);
                 for j = 1:totalCount, resetKart(j); end
                 render();
             otherwise
@@ -436,13 +466,24 @@ function fig = phx_kart_demo(options)
         for j = 1:totalCount
             poses(j,:) = bodies(j).Position; anglesAll(j,:) = bodies(j).EulerAngles;
             matrices{j} = phxkart.surfacePose(T,poses(j,1:2),anglesAll(j,3));
-            poses(j,3) = poses(j,3)+matrices{j}(3,4);
+            if isempty(T.course)
+                poses(j,3) = poses(j,3)+matrices{j}(3,4);
+            else
+                matrices{j}(3,4)=poses(j,3)-.25;
+                if airborne(j)
+                    v=bodies(j).LinearVelocity; pitch=atan2(v(3),max(norm(v(1:2)),1));
+                    yaw=anglesAll(j,3); f=[cos(yaw)*cos(pitch);sin(yaw)*cos(pitch);sin(pitch)];
+                    side=[-sin(yaw);cos(yaw);0];
+                    matrices{j}(1:3,1:3)=[f side cross(f,side)];
+                end
+            end
             for k = 1:2
                 wheelMatrices{j,k} = poseMatrix([G{1,j}.points(k,:) .17],S{j}.steer);
             end
         end
         [lights,~] = phxkart.startSignal(nowTime-startSequenceTime,options.StartLights);
         for viewIndex = 1:count
+            phxkart.updateCourse(courseViews{viewIndex},T,courseBodies);
             if lights~=renderedLights
                 for lamp = 1:5
                     color = [.13 .018 .015]; if lamp<=lights, color = [1 .035 .015]; end
@@ -478,8 +519,10 @@ function fig = phx_kart_demo(options)
             phxkart.updateBars(inputBars{j},s);
             gear = sprintf('%d',s.gear); if ~P{j}.manual, gear = 'FIXED'; end
             if s.gear==-1, gear = 'R'; elseif s.gear==0, gear = 'N'; end
-            hud(j).String = sprintf('PLAYER %d\n%5.1f km/h\n%5.0f RPM   /   %s\nGRIP %3.0f%%  |  %s', ...
+            hudText = sprintf('PLAYER %d\n%5.1f km/h\n%5.0f RPM   /   %s\nGRIP %3.0f%%  |  %s', ...
                 j,d.speed,s.rpm,gear,100*d.grip,roadName(d.onRoad));
+            if airborne(j), hudText=[hudText newline 'AIRBORNE']; end
+            hud(j).String=hudText;
             elapsed = 0; if r.started, elapsed = nowTime-r.startTime; end
             good = r.times(logical(r.validTimes)); best = '--';
             if ~isempty(good), best = sprintf('%.3f s',min(good)); end
@@ -513,6 +556,9 @@ function fig = phx_kart_demo(options)
         data = struct('Time',nowTime,'States',{S},'Race',{race},'Paused',paused,'Running',running);
         data.Controls = controlConfig(1:count);
         data.NPCs = npcCount; data.Difficulty = difficulty; data.NPCState = npcState;
+        data.Airborne=airborne;
+        data.CoursePosition=zeros(numel(courseBodies),3);
+        for k=1:numel(courseBodies), data.CoursePosition(k,:)=courseBodies(k).Position; end
         [data.StartLights,locked] = phxkart.startSignal(nowTime-startSequenceTime,options.StartLights);
         data.StartReady = ~locked;
         data.Position = zeros(totalCount,3); data.Velocity = zeros(totalCount,3);
@@ -541,6 +587,10 @@ function fig = phx_kart_demo(options)
             if isvalid(obstacles(j)), delete(obstacles(j)); end
         end
         obstacles = phx.Body.empty;
+        for j=1:numel(courseBodies)
+            if isvalid(courseBodies(j)), delete(courseBodies(j)); end
+        end
+        courseBodies=phx.Body.empty; courseViews={};
     end
     function closeDemo(varargin)
         releaseWorld();

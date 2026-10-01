@@ -11,6 +11,7 @@ function A = npcPlan(T,difficulty)
     lateral = [3.2 4.6 6.0 7.8]; top = [12 16 20 24];
     braking = [2.5 2.5 2.5 3.4];
     A.speed = min(top(level),sqrt(lateral(level)./max(abs(A.curvature),.002)));
+    if isfield(T,'course') && ~isempty(T.course), A.speed=min(A.speed,10); end
     % Anticipate corners using a braking envelope, including across finish.
     for pass = 1:3
         for k = numel(A.ds):-1:1

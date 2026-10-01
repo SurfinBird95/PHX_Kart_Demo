@@ -2,6 +2,19 @@ function [height,gradient,gripScale] = roadSurface(T,position)
 %ROADSURFACE Banked ribbon with a sloping outer earth shoulder.
 % Gradient is dz/dx,dz/dy. PHX chassis contacts remain projected in XY.
     height = 0; gradient = [0 0]; gripScale = 1;
+    if isfield(T,'course') && ~isempty(T.course)
+        for r=T.course.ramps
+            f=[cos(r.yaw) sin(r.yaw)]; n=[-f(2) f(1)];
+            along=dot(position-r.center,f); across=dot(position-r.center,n);
+            if abs(across)>r.width/2 || along<0 || along>r.length+r.descent, continue; end
+            if along<=r.length
+                height=r.height*along/r.length; gradient=r.height/r.length*f;
+            else
+                height=r.height*(1-(along-r.length)/r.descent); gradient=-r.height/r.descent*f;
+            end
+        end
+        return;
+    end
     if ~any(T.bank), return; end
     [~,index] = min(sum((T.xy-position).^2,2));
     count = size(T.xy,1); starts = [mod(index-2,count)+1 index];
