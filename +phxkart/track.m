@@ -55,8 +55,8 @@ function T = track(name)
     T.course = [];
     if strcmpi(name,'obstacle')
         T.course.ramps=struct('center',{},'yaw',{},'length',{},'height',{},'width',{},'descent',{});
-        T.course.ramps(1)=struct('center',[-5 -14],'yaw',0,'length',6,'height',1.1,'width',6,'descent',1.5);
-        T.course.ramps(2)=struct('center',[8 14],'yaw',pi,'length',4.5,'height',.8,'width',5.5,'descent',1.5);
+        T.course.ramps(1)=struct('center',[-5 -14],'yaw',0,'length',6,'height',1.1,'width',T.width,'descent',1.5);
+        T.course.ramps(2)=struct('center',[8 14],'yaw',pi,'length',4.5,'height',.8,'width',T.width,'descent',1.5);
         T.course.hay=[-5 14 0;-10 11.7 .25;-13 16 -.2;-34 3 .4;-35 -1 -.3];
         T.course.cones=[9 -13.25 0;13 -14.75 0;17 -13.25 0;21 -14.75 0;25 -12.9 0;28 -13.4 0];
         T.course.pivot=[36 0 5]; T.course.yaw=pi/2;

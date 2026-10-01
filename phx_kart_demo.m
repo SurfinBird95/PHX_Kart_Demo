@@ -46,6 +46,7 @@ function fig = phx_kart_demo(options)
         'WindowKeyPressFcn',@keyDown,'WindowKeyReleaseFcn',@keyUp);
     sim = []; bodies = phx.Body.empty; obstacles = phx.Body.empty; clockTimer = [];
     courseBodies=phx.Body.empty; courseViews={}; airborne=[];
+    rolls=[]; rollRates=[]; tipped=[];
     running = false; paused = false; busy = false; keys = struct;
     steeringPriority = [0 0];
     T = []; P = {}; S = {}; race = {}; diagnostics = {};
@@ -178,6 +179,7 @@ function fig = phx_kart_demo(options)
         count = n; T = phxkart.track(trackName); nowTime = 0; startSequenceTime = 0;
         totalCount = n+npcCount; npcPlan = phxkart.npcPlan(T,difficulty);
         airborne=false(1,totalCount); courseViews=cell(1,n);
+        rolls=zeros(1,totalCount); rollRates=rolls; tipped=false(1,totalCount);
         npcState = cell(1,totalCount); npcCommands = zeros(totalCount,3);
         if isscalar(manual), manual = repmat(manual,1,n); end
         P = cell(1,totalCount); S = cell(1,totalCount); race = cell(1,totalCount); diagnostics = cell(1,totalCount);
@@ -261,6 +263,7 @@ function fig = phx_kart_demo(options)
         bodies(j).Position = [xy .25];
         if ~isempty(T.course), bodies(j).Position=[xy .25+phxkart.roadSurface(T,xy)]; end
         airborne(j)=false;
+        rolls(j)=0; rollRates(j)=0; tipped(j)=false;
         bodies(j).EulerAngles = [0 0 yaw];
         bodies(j).LinearVelocity = [0 0 0]; bodies(j).AngularVelocity = [0 0 0];
         S{j} = phxkart.state;
@@ -309,20 +312,30 @@ function fig = phx_kart_demo(options)
                     distance = min(vecnorm(T.roadXY-pos(1:2),2,2));
                     onRoad = distance < T.width/2;
                     if race{j}.started && distance>T.width/2+.5, race{j}.valid = false; end
-                    velocity = (bodies(j).Orientation'*bodies(j).LinearVelocity')';
+                    angles=bodies(j).EulerAngles; yaw=angles(3);
+                    rotation=[cos(yaw) -sin(yaw) 0;sin(yaw) cos(yaw) 0;0 0 1];
+                    velocity = (rotation'*bodies(j).LinearVelocity')';
                     w = bodies(j).AngularVelocity;
                     [height,grade,gripScale] = phxkart.roadSurface(T,pos(1:2));
                     if ~isempty(T.course)
-                        airborne(j)=pos(3)>height+.285;
+                        [height,grade,difference]=phxkart.rampSupport(T,pos(1:2),yaw,P{j}.track);
+                        clearance=.25*abs(cos(rolls(j)))+.56*abs(sin(rolls(j)));
+                        airborne(j)=pos(3)>height+clearance+.035;
+                        if ~gridLocked
+                            [rolls(j),rollRates(j),tipped(j)]=phxkart.rollStep(rolls(j),rollRates(j), ...
+                                tipped(j),difference,P{j}.track,airborne(j),dt);
+                        end
                     end
-                    rotation = bodies(j).Orientation;
                     grade = (rotation(1:2,1:2)'*grade')';
                     [S{j},force,moment,diagnostics{j}] = phxkart.forces( ...
                         S{j},P{j},velocity,w(3),readInput(j),onRoad,dt,grade,gripScale);
                     if ~isempty(T.course)
-                        if airborne(j)
+                        if airborne(j) || tipped(j)
                             force=[-.25*velocity(1)*abs(velocity(1)) -.25*velocity(2)*abs(velocity(2)) 0];
                             moment=[0 0 0]; diagnostics{j}.grip=0;
+                            if tipped(j) && ~airborne(j)
+                                force(1:2)=-P{j}.mass*5*velocity(1:2)/max(norm(velocity(1:2)),1);
+                            end
                         end
                         force(3)=-P{j}.mass*9.81;
                     end
@@ -330,7 +343,8 @@ function fig = phx_kart_demo(options)
                         bodies(j).LinearVelocity = [0 0 0]; bodies(j).AngularVelocity = [0 0 0];
                         S{j}.ax = 0; S{j}.ay = 0;
                     else
-                        bodies(j).applyForce(force); bodies(j).applyTorque(moment);
+                        bodies(j).applyForce((rotation*force')',[],false);
+                        bodies(j).applyTorque(moment,false);
                     end
                 end
                 sim.step(dt,1,-1);
@@ -342,13 +356,14 @@ function fig = phx_kart_demo(options)
                     if isempty(T.course)
                         pos(3)=.25; v(3)=0;
                     else
-                        [height,grade]=phxkart.roadSurface(T,pos(1:2));
-                        if pos(3)<=height+.25
-                            pos(3)=height+.25; v(3)=dot(grade,v(1:2));
+                        [height,grade]=phxkart.rampSupport(T,pos(1:2),angle(3),P{j}.track);
+                        clearance=.25*abs(cos(rolls(j)))+.56*abs(sin(rolls(j)));
+                        if pos(3)<=height+clearance
+                            pos(3)=height+clearance; v(3)=dot(grade,v(1:2));
                         end
-                        airborne(j)=pos(3)>height+.285;
+                        airborne(j)=pos(3)>height+clearance+.035;
                     end
-                    bodies(j).Position=pos; bodies(j).EulerAngles=[0 0 angle(3)];
+                    bodies(j).Position=pos; bodies(j).EulerAngles=[rolls(j) 0 angle(3)];
                     bodies(j).LinearVelocity=v; bodies(j).AngularVelocity=[0 0 w(3)];
                     race{j} = phxkart.checkGate(race{j},T,prev(j,:),pos(1:2),nowTime,dt);
                     if norm(pos(1:2))>160, resetKart(j); end
@@ -396,6 +411,7 @@ function fig = phx_kart_demo(options)
         bodies(j).Position = [xy .25]; bodies(j).EulerAngles = [0 0 yaw];
         if ~isempty(T.course), bodies(j).Position=[xy .25+phxkart.roadSurface(T,xy)]; end
         airborne(j)=false;
+        rolls(j)=0; rollRates(j)=0; tipped(j)=false;
         bodies(j).LinearVelocity = [0 0 0]; bodies(j).AngularVelocity = [0 0 0];
         S{j} = phxkart.state; race{j}.valid = false;
         npcState{j}.index = index; npcState{j}.stuck = 0;
@@ -476,6 +492,9 @@ function fig = phx_kart_demo(options)
                     side=[-sin(yaw);cos(yaw);0];
                     matrices{j}(1:3,1:3)=[f side cross(f,side)];
                 end
+                c=cos(rolls(j)); s=sin(rolls(j));
+                matrices{j}(1:3,1:3)=matrices{j}(1:3,1:3)*[1 0 0;0 c -s;0 s c];
+                matrices{j}(1:3,4)=poses(j,:)'-matrices{j}(1:3,1:3)*[0;0;.25];
             end
             for k = 1:2
                 wheelMatrices{j,k} = poseMatrix([G{1,j}.points(k,:) .17],S{j}.steer);
@@ -522,6 +541,7 @@ function fig = phx_kart_demo(options)
             hudText = sprintf('PLAYER %d\n%5.1f km/h\n%5.0f RPM   /   %s\nGRIP %3.0f%%  |  %s', ...
                 j,d.speed,s.rpm,gear,100*d.grip,roadName(d.onRoad));
             if airborne(j), hudText=[hudText newline 'AIRBORNE']; end
+            if tipped(j), hudText=[hudText newline 'ROLLED OVER - press R']; end
             hud(j).String=hudText;
             elapsed = 0; if r.started, elapsed = nowTime-r.startTime; end
             good = r.times(logical(r.validTimes)); best = '--';
@@ -557,6 +577,7 @@ function fig = phx_kart_demo(options)
         data.Controls = controlConfig(1:count);
         data.NPCs = npcCount; data.Difficulty = difficulty; data.NPCState = npcState;
         data.Airborne=airborne;
+        data.Roll=rolls; data.RolledOver=tipped;
         data.CoursePosition=zeros(numel(courseBodies),3);
         for k=1:numel(courseBodies), data.CoursePosition(k,:)=courseBodies(k).Position; end
         [data.StartLights,locked] = phxkart.startSignal(nowTime-startSequenceTime,options.StartLights);
