@@ -1,5 +1,7 @@
 # PHX Kart Lab
 
+[![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=SurfinBird95/PHX_Kart_Demo&project=matlab.toml)
+
 A playable kart racing demo built in MATLAB with **PHX Toolbox by Lubor Zháňal / HUMUSOFT**, developed iteratively with **OpenAI Codex and ChatGPT**.
 
 Race alone, share a keyboard with a friend, or add up to eight NPC opponents. This is an interactive physics demo with deliberately tuned handling, not a validated vehicle simulator.
@@ -11,16 +13,42 @@ Race alone, share a keyboard with a friend, or add up to eight NPC opponents. Th
 | Component | Requirement |
 | --- | --- |
 | MATLAB | R2025a or newer; tested with R2026a Update 5 on Windows |
-| PHX Toolbox | Install separately; this demo was tested with version 1.0.9 |
-| Input and display | Desktop MATLAB, a keyboard and an interactive graphics window |
+| PHX Toolbox | Version 1.0.9 or newer; declared as a project dependency for R2026b+. Tested locally with 1.0.9 |
+| Input and display | Keyboard and interactive graphics; Windows desktop tested, MATLAB Online verification pending |
 
 No Simulink, MATLAB Compiler, Python, OpenAI account or API key is required to play. MATLAB Runtime alone cannot run these source files. Additional MathWorks products were not identified by MATLAB dependency analysis.
 
 PHX supports Windows, macOS and Linux; this demo has only been tested on Windows. The minimum MATLAB release follows the [PHX requirements](https://www.humusoft.eu/en/blog/phx-preview-eng/); older supported releases have not been tested with this demo.
 
-## Download and play
+## Open in MATLAB Online / R2026b+
+
+Click **Open in MATLAB Online** above and sign in to your MathWorks account. The link requests a clone of this repository and opens `matlab.toml` as a MATLAB project. This project format requires **R2026b or newer**; the badge does not select a specific MATLAB release.
+
+The project declares `PHXToolbox >=1.0.9`. MATLAB resolves package dependencies from its configured repositories when the project opens. Complete any dependency or project-startup prompts that MATLAB presents. Once dependencies are available, the startup function opens the game menu. The **Play PHX Kart Lab** project shortcut reopens it later.
+
+If only the repository opens, double-click `matlab.toml` in the Files panel to open the project. If the game menu does not appear, run `start_kart_lab`. If dependency resolution fails, inspect the project's issues and package-manager message; the manual installation route below remains available.
+
+**Validation status:** TOML syntax and referenced paths have been checked, and the launcher has been tested locally in R2026a. Project loading, automatic PHX installation, and gameplay in R2026b/MATLAB Online have **not yet been verified**. In the browser, start with one player and no NPCs, click the game view before using the keyboard, and then increase the NPC count if performance permits.
+
+### Verify automatic setup
+
+1. Use a MATLAB Online environment where PHX has not already been installed. Do not uninstall a working copy just for this test; an existing installation can verify launch, but not first-time dependency installation.
+2. Click the badge and check `version('-release')`: it must report R2026b or newer.
+3. Open `matlab.toml` as a project and let dependency resolution finish. Do **not** run `mpminstall` manually during this test.
+4. Run `which phx.Simulation` and `which phx_kart_demo`. Both must return file paths, with the demo coming from the cloned repository.
+5. Check that the menu opens. Select a track, start driving, wait for lights out, and try steering, braking, pause, and reset. Then try NPCs and split screen.
+
+If something fails, report the MATLAB release, the full error message, and whether PHX was already installed. A successful local R2026a launch alone does not verify the R2026b dependency workflow.
+
+This setup follows the MathWorks documentation for [TOML projects and automatic dependencies](https://www.mathworks.com/help/matlab/matlab_prog/toml-format-for-matlab-projects.html), [configuration syntax](https://www.mathworks.com/help/matlab/ref/matlab.toml.html), and [Open in MATLAB Online links](https://www.mathworks.com/help/matlab/matlab_env/open-github-repositories-in-matlab-online.html).
+
+## Download and play (including R2025a / R2026a)
+
+The existing direct-launch workflow is unchanged. These releases do not require opening `matlab.toml`.
 
 1. Install PHX Toolbox through MATLAB's Add-On Explorer (search for **PHX Toolbox**), or download `PHXToolbox.mltbx` from the [official PHX releases](https://github.com/Humusoft/phx/releases) and open it in MATLAB.
+
+   Alternatively, if PHX is available in your package manager's configured repositories, run `mpminstall PHXToolbox`.
 2. [Download this repository as a ZIP](https://github.com/SurfinBird95/PHX_Kart_Demo/archive/refs/heads/main.zip) and extract it, or clone it:
 
    ```sh

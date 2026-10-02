@@ -1,0 +1,17 @@
+# MATLAB project format introduced in R2026b.
+# Older releases can still run phx_kart_demo directly.
+name = "PHX Kart Lab"
+
+[folders]
+path = ["."]
+
+[dependencies]
+PHXToolbox = ">=1.0.9"
+
+[project]
+summary = "Interactive kart racing and vehicle dynamics demo powered by PHX Toolbox."
+startup-folder = "."
+startup-files = ["start_kart_lab.m"]
+
+[project.shortcuts]
+"Play PHX Kart Lab" = {path = "start_kart_lab.m"}
